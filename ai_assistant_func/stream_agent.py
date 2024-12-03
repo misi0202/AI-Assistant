@@ -10,18 +10,21 @@ from langchain_core.messages import AIMessage, HumanMessage
 from zhipuai import ZhipuAI
 import asyncio
 import sys, os
+import numpy as np
+from sentence_transformers import SentenceTransformer, util
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'retriever'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'utils'))
-load_dotenv("E:\\vue_pro\\ai_assistant\\ai_assistant_func\.env")
+load_dotenv("/root/workspace/AI-Assistant/ai_assistant_func/.env")
 
+from hybrid_retriever import hybrid_search, Text2Vector, get_partition_name
 from retriever_base import BaseRetriever
 from timer import time_it
 
 GLM_MODEL = os.getenv("GLM_MODEL")
 GLM_API_KEY = os.getenv("GLM_API_KEY")
 GLM_ENDPOINT = os.getenv("GLM_ENDPOINT")
-# print(GLM_MODEL, GLM_API_KEY, GLM_ENDPOINT)
+print(GLM_MODEL, GLM_API_KEY, GLM_ENDPOINT)
 model = ChatOpenAI(
     temperature=0.95,
     model=GLM_MODEL,
@@ -29,6 +32,32 @@ model = ChatOpenAI(
     openai_api_base=GLM_ENDPOINT,
     streaming= True
 )
+
+
+@tool
+async def hybrid_single_retriever(user_input: str, course_name: str) -> list:
+    """异步混合检索器
+
+    Args:
+        vector1: 向量1
+        vector2: 向量2
+        col_name: 集合名称
+
+    Returns:
+        context: 检索到的文本和标题
+    """
+    col_name = "Chunk_Collection"
+    # 先根据Course_name检索到partition_name
+    partition_name = get_partition_name(course_name)
+    print(f"分区名称：{partition_name}")
+    model_1 = SentenceTransformer("/root/.cache/modelscope/hub/model1001/Conan")
+    model_2 = ZhipuAI(api_key = "864eeb3324cb0bd34584e397a70caacf.jllKABCzmHYJPxfV")
+    vector_1 = Text2Vector(user_input, model_1, "Conan")
+    vector_2 = Text2Vector(user_input, model_2, "embedding-3")
+    vector_1 = np.array([vector_1], dtype=np.float32)
+    vector_2 = np.array([vector_2], dtype=np.float32) 
+    context = hybrid_search(vector_1, vector_2, col_name, partition_name=partition_name, top_k=3)
+    return context
 
 @tool
 async def RAG_retriever(query : str) -> list[dict]:
@@ -77,14 +106,14 @@ async def single_retriever(course_name: str, query : str) -> list[dict]:
     return result
 
 # 注册agent 构建模板
-def init_agent():
+def init_agent(retriever = hybrid_single_retriever):
     """初始化agent 创建提示词模板"""
     prompt = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
                 """You are professor with rich knowledge about {course_name}. 
-                Use single_retriever tool to get the knowledge and answer the question""",
+                Use retriever tool to get the knowledge and answer the question""",
             ),
             # 加入对话的历史
             MessagesPlaceholder(variable_name="chat_history"),
@@ -94,7 +123,7 @@ def init_agent():
     )
 
 
-    tools = [single_retriever]
+    tools = [retriever]
     agent = create_openai_tools_agent(
         model.with_config({"tags": ["agent_llm"]}), tools, prompt
     )
@@ -121,12 +150,11 @@ async def chat_with_user(course_name = "Machine Learning", user_input = "What is
     return chunks, result, chat_history
 
 
-
 async def test():
     agent_executor = init_agent()
     chat_history = []
-    course_name = "Machine Learning"
-    user_input = "What is Lasso Regression?"
+    course_name = "知识社会史"
+    user_input = "介绍下人类观测组织"
     async for step in agent_executor.astream(
     {"course_name": course_name,"input": user_input, "chat_history": chat_history}
     ):
@@ -154,7 +182,7 @@ if __name__ == "__main__":
     while True:
         user_input = input(f"\033[33m请输入你的问题：\033[0m\n")
         # What is Lasso Regression? What is the Ridge Regression and the difference between Lasso and Ridge Regression?
-        chunks, result, chat_history = asyncio.run(chat_with_user(user_input=user_input, chat_history=chat_history))
+        chunks, result, chat_history = asyncio.run(chat_with_user(course_name="机器学习",user_input=user_input, chat_history=chat_history))
         print(f"\033[32m检索结果:\033[0m\n")
         print(f"{chunks}")
         print(f"\033[34m回答:\033[0m\n{result}")
