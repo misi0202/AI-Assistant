@@ -17,7 +17,7 @@ parent_dir = os.path.dirname(current_file_path)
 func_dir = os.path.join(os.path.dirname(parent_dir),"ai_assistant_func")
 sys.path.append(func_dir)
 
-from stream_agent import chat_with_user
+from stream_agent import AgentUtils
 # from utils.knowledge_database import Neo4jUtils
 from utils.milvus_database import MilvusUtils
 from utils.file_utils import FileUtils
@@ -37,6 +37,7 @@ app.config['MAX_CONTENT_LENGTH'] = 128 * 1024 * 1024
 ALLOWED_EXTENSIONS = {'pdf', 'pptx', 'ppt'}
 
 Milvus = MilvusUtils()
+Agent = AgentUtils()
 # 检查文件扩展名是否合法
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -155,8 +156,7 @@ def knowledge_qa():
             item["content"] = item["content"].split("\n\n---\n\n", 1)[0]
         except:
             pass
-
-    chunks, response, _ = asyncio.run(chat_with_user(course_name=course_name, user_input=user_input, chat_history=history))
+    chunks, response, _ = asyncio.run(Agent.chat_with_user(course_name=course_name, user_input=user_input, chat_history=history))
     result = {
         "chunks": chunks,
         "response": response
