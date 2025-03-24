@@ -4,8 +4,9 @@ from pymilvus import (
     MilvusClient,
     utility,
     FieldSchema, CollectionSchema, DataType,
-    Collection, AnnSearchRequest, RRFRanker, connections,WeightedRanker
+    Collection, AnnSearchRequest, RRFRanker, connections,WeightedRanker, RRFRanker
 )
+
 from langchain.tools import tool
 from sentence_transformers import SentenceTransformer, util
 from zhipuai import ZhipuAI
@@ -91,8 +92,11 @@ def hybrid_search(vector1, vector2, col_name, top_k = 3, partition_name=None, us
     req = AnnSearchRequest(**search_param2)
     req_list.append(req)
 
-        # output_fields 用于指定返回结果中的字段，这里只返回文本字段
-    result = collection.hybrid_search(req_list, WeightedRanker(*weights), limit = top_k, partition_names = [partition_name],output_fields=['text', 'title', 'source_book'])
+    RRF_ranker = RRFRanker(k=60)
+    # output_fields 用于指定返回结果中的字段，这里只返回文本字段
+    # result = collection.hybrid_search(req_list, WeightedRanker(*weights), limit = top_k, partition_names = [partition_name],output_fields=['text', 'title', 'source_book'])
+    # 考虑到两个向量并没有明显权重，故这里使用RRFRanker
+    result = collection.hybrid_search(req_list, RRF_ranker, limit = top_k, partition_names = [partition_name],output_fields=['text', 'title', 'source_book'])
         
     similar_docs =  result[0]
     context = [{'content':doc.entity.get('title') + doc.entity.get('text'), 'source': doc.entity.get('source_book')} for doc in similar_docs]

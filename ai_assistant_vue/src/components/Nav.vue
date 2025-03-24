@@ -15,6 +15,7 @@
 import { Nav } from '@kousum/semi-ui-vue';
 import { IconSemiLogo } from '@kousum/semi-icons-vue';
 import { IconDescriptions, IconTree, IconAvatar, IconOverflow,IconBanner,IconForm,IconAccessibility } from '@kousum/semi-icons-lab-vue';
+import { useStore } from 'vuex';
 
 export default {
   components: {
@@ -26,7 +27,25 @@ export default {
   },
   data() {
     return {
-      navItems: [
+      navItems: this.getNavItems(),
+      header: {
+        text: '东华大学AI助教系统',
+      },
+      footer: {
+        collapseButton: true,
+      },
+    };
+    
+  },
+  methods: {
+    getNavItems() {
+      const role = this.$store.state.user.role;
+      console.log("权限级别"+role)
+      switch(role){
+        // 最高权限 管理员
+        case 0:
+          console.log("管理员")
+          return [
         {
           itemKey: 'chat',
           text: '助教对话',
@@ -49,16 +68,42 @@ export default {
           icon: <IconAccessibility />, 
         }
 
-      ],
-      header: {
-        text: '东华大学AI助教系统',
-      },
-      footer: {
-        collapseButton: true,
-      },
-    };
-  },
-  methods: {
+      ];
+      // 教师界面
+      case 1:
+        return [
+        {
+          itemKey: 'chat',
+          text: '助教对话',
+          icon: <IconOverflow />, 
+        },
+        {
+          itemKey: 'config',
+          text: '知识库管理',
+          icon: <IconBanner />,  
+          items: ['创建知识库', '修改知识库','上传文件'],
+        },
+        {
+          itemKey: 'Choose',
+          text: '重新选择课程',
+          icon: <IconForm />, 
+        }
+      ];
+      case 2:
+        return [
+        {
+          itemKey: 'chat',
+          text: '助教对话',
+          icon: <IconOverflow />, 
+        },
+        {
+          itemKey: 'Choose',
+          text: '重新选择课程',
+          icon: <IconForm />, 
+        }
+      ];
+      }
+    },
     handleSelect(data) {
       console.log('trigger onSelect: ', data);
     },

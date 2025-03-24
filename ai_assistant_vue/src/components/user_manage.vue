@@ -1,14 +1,37 @@
 <template>
-    <div style="visibility: visible; color: #000000;">
-      <ul>
-        <li v-for="([key, user],) in userEntries" :key="key" style="margin-bottom: 10px; padding: 10px; border: 1px solid #ccc;">
-          <p style="display: inline; margin-right: 10px; padding: 5px; border: 1px solid #000;">Username: {{ user.username }}</p>
-          <p style="display: inline; margin-right: 10px; padding: 5px; border: 1px solid #000;">Password: {{ user.password }}</p>
-          <p style="display: inline; margin-right: 10px; padding: 5px; border: 1px solid #000;">ID: {{ user.id }}</p>
-          <Button>点击修改</Button>
-        </li>
-      </ul>
-    </div>
+<div style="visibility: visible; color: #000000;">
+  <ul>
+    <form style="margin: 20px;">
+      <li v-for="([key, user]) in userEntries" :key="key" style="margin: 30px; padding: 30px; border: 1px solid #ccc; height:100px">
+        <label for="user_id" style="margin-left:20px;">用户id:</label>
+        <input type="text" id="user_id" name="user_id" v-model="user.id" readonly>
+
+        <label for="username" style="margin-left:20px;">用户名:</label>
+        <input type="text" id="username" name="username" v-model="user.username">
+
+        <label for="password" style="margin-left:20px;">用户密码:</label>
+        <input type="text" id="password" name="password" v-model="user.password">
+
+          <span style="margin-left:20px;">用户权限:</span>
+          <input type="radio" :name="'role-' + key" id="role_admin" v-model="user.role" :value="2">
+          <label for="role_admin">学生</label>
+
+          <input type="radio" :name="'role-' + key" id="role_teacher" v-model="user.role" :value="1">
+          <label for="role_teacher">教师</label>
+
+          <input type="radio" :name="'role-' + key" id="role_student" v-model="user.role" :value="0">
+          <label for="role_student">管理员</label>
+
+        <button type="button" @click="updateUser(key, user)">点击修改</button>
+      </li>
+    </form>
+  </ul>
+</div>
+
+
+
+
+    
   </template>
   
   
@@ -17,6 +40,8 @@
   import { ref, nextTick, onActivated, onMounted, reactive,  computed } from 'vue';
   import { List, Avatar, ButtonGroup, Toast, Button, Notification } from '@kousum/semi-ui-vue';
   import axios from 'axios';
+  import { useRouter } from 'vue-router';
+  const router = useRouter();
   
   
   const state = reactive({
@@ -48,50 +73,39 @@
         console.log('nextTick');
       });
     } catch (err) {
-      Toast.error('获取知识库失败');
+      Toast.error('获取用户失败');
     }
   }
   
-  const handleFileChange = () => {
-    uploadFlag.value = true;
-    console.log("uploadFlag", uploadFlag.value);
-  };
+
   
-  const handleSubmit = (values) => {
-    console.log("Form", values.tree);
-    if (!uploadFlag.value) {
-      Toast.error('请上传文件');
-    } else {
-      console.log("上传文件");
-      Notification.info({
-        title: '上传文件至知识库',
-        content: '请稍等,上传时不要关闭此页面',
-        duration: 0,
-        theme: 'light',
+  async function updateUser(key, user) {
+    console.log('更新用户:', user);
+    const username = user.username;
+    const password = user.password;
+    const id = user.id;
+    const role = user.role;
+    try {
+
+      const res = await axios.post('http://127.0.0.1:5000/api/UpdateUser',{
+        user_id: id,
+        username: username,
+        password: password,
+        role: role
       });
-      const data = { KGName: values.tree };
-      axios.post('http://127.0.0.1:5000/api/upload2kg', data)
-        .then(res => {
-          console.log(res.data);
-          Notification.success({
-            title: '上传成功',
-            content: '文件已解析至对应知识库',
-            duration: 0,
-            theme: 'light',
-          });
-        })
-        .catch(err => {
-          console.error('Error:', err);
-        });
+      state.UserData = res.data;
+      console.log(state.UserData);
+      nextTick(() => {
+        Toast.success('用户更新成功');
+      });
+    } catch (err) {
+      Toast.error('用户更新失败');
     }
-  };
+    router.push({ name: 'Choose' });
+  }
   </script>
   
   <style scoped>
-  div.semi-form-field {
-    width: 400px;
-    font-size: 12px;
-    font-weight: bold;
-  }
+
   </style>
   

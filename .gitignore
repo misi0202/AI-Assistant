@@ -1,2 +1,9 @@
 /ai_assistant_flask/uploads/
-/ai_assistant_func/data/
+/ai_assistant_func/data/*
+/ai_assistant_func/model/Conan/*
+/ai_assistant_func/model/modelscope/*
+/ai_assistant_func/__pycache__/*
+/ai_assistant_func/__pycache__/*
+/ai_assistant_func/utils/__pycache__/*
+/ai_assistant_func/model/*
+/ai_assistant_func/extract/pdf/*

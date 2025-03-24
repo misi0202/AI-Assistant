@@ -114,7 +114,6 @@ def knowledge_qa():
         "chunks": chunks,
         "response": response
     }
-    print(result)
     return result
 
 # 创建知识库

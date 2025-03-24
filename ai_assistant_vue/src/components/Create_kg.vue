@@ -15,7 +15,16 @@
                     { type: 'string', message: 'type error' },
                 ]"
       ></Form.Input>
-
+      <Form.Input 
+        field="PartitionName" 
+        label="分区名称" 
+        :style="{ width: '100%', margin: '20px 0px 10px 0px' }" 
+        placeholder="英文和数字组合 无其他字符"
+        :rules="[
+                    { required: true, message: 'required error' },
+                    { type: 'string', message: 'type error' },
+                ]"
+      ></Form.Input>
 
       <Form.Checkbox 
         field="agree" 

@@ -15,6 +15,18 @@ def login_list():
     with engine.connect() as conn:
         results = conn.execute(text(sql))
         return [row for row in results]
+    
+def update_user(username, password, id, role):
+    sql = 'UPDATE users SET username = :username, passwd = :password, role = :role WHERE id = :id'
+    with engine.connect() as conn:
+        conn.execute(text(sql), {
+            'username': username,
+            'password': password,
+            'id': id,
+            'role': role
+        })
+        conn.commit()  # 确保提交事务
+    return "success"
 
 if __name__ == '__main__':
     print(login_list())

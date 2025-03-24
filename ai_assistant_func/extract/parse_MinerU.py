@@ -8,7 +8,10 @@ from magic_pdf.libs.draw_bbox import draw_layout_bbox, draw_span_bbox
 from magic_pdf.pipe.UNIPipe import UNIPipe
 from magic_pdf.pipe.OCRPipe import OCRPipe
 from magic_pdf.pipe.TXTPipe import TXTPipe
-from magic_pdf.rw.DiskReaderWriter import DiskReaderWriter
+from magic_pdf.data.data_reader_writer import FileBasedDataWriter
+import magic_pdf.model as model_config 
+model_config.__use_inside_model__ = True;
+
 
 
 # todo: 设备类型选择 （？）
@@ -35,9 +38,10 @@ def json_md_dump(
     # )
 
     # text文本结果写入到 conent_list.json
-    md_writer.write(
-        content=json.dumps(content_list, ensure_ascii=False, indent=4),
-        path=f"{pdf_name}_content_list.json"
+    # text文本结果写入到 conent_list.json
+    md_writer.write_string(
+        f'{pdf_name}_content_list.json',
+        json.dumps(content_list, ensure_ascii=False, indent=4)
     )
     return f"{pdf_name}_content_list.json"
 
@@ -76,7 +80,9 @@ def pdf_parse_main(
             output_path = os.path.join(pdf_path_parent, pdf_name)
 
         output_image_path = os.path.join(output_path, 'images')
-
+        os.mkdir(output_path)
+        os.mkdir(output_image_path)
+        
         # 获取图片的父路径，为的是以相对路径保存到 .md 和 conent_list.json 文件中
         image_path_parent = os.path.basename(output_image_path)
 
@@ -93,7 +99,7 @@ def pdf_parse_main(
 
         # 执行解析步骤
         # image_writer = DiskReaderWriter(output_image_path)
-        image_writer, md_writer = DiskReaderWriter(output_image_path), DiskReaderWriter(output_path)
+        image_writer, md_writer = FileBasedDataWriter(output_image_path), FileBasedDataWriter(output_path)
 
         # 选择解析方式
         # jso_useful_key = {"_pdf_type": "", "model_list": model_json}

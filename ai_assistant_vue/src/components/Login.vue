@@ -129,32 +129,31 @@
   </style>
 
   <script>
-  import { Toast} from '@kousum/semi-ui-vue';
-  import { mapMutations } from "vuex";
-  import axios from 'axios'; 
- 
+import { Toast } from '@kousum/semi-ui-vue';
+import { mapMutations } from "vuex";
+import { useStore } from 'vuex';
+import { useRouter } from 'vue-router'; // 引入 useRouter
+import axios from 'axios';
+import { ref } from 'vue';
+
 export default {
   name: "Login",
-  data: function () {
-    return {
-      loginForm: {
-        account: "",
-        passWord: "",
-      },
-      loginRules: {
-        account: [{ required: true, message: "请输入账号", trigger: "blur" }],
-        passWord: [{ required: true, message: "请输入密码", trigger: "blur" }],
-      },
+  setup() {
+    const store = useStore();
+    const router = useRouter(); // 获取路由实例
+    const loginForm = ref({
+      account: "",
+      passWord: "",
+    });
+    const loginRules = ref({
+      account: [{ required: true, message: "请输入账号", trigger: "blur" }],
+      passWord: [{ required: true, message: "请输入密码", trigger: "blur" }],
+    });
+    const isLoggedIn = ref(false);
 
-      isLoggedIn: false
-    };
-  },
- 
-  methods: {
-    ...mapMutations(["changeLogin"]),
-    submitForm() {
-      const userAccount = this.loginForm.account;
-      const userPassword = this.loginForm.passWord;
+    const submitForm = () => {
+      const userAccount = loginForm.value.account;
+      const userPassword = loginForm.value.passWord;
       if (!userAccount) {
         Toast.info('账号不能为空！');
       }
@@ -166,25 +165,30 @@ export default {
         passwd: userPassword,
       };
       axios.post('http://127.0.0.1:5000/api/login_check', data)
-      .then(res => {
-        if (res.data == "True"){
-            this.isLoggedIn = true;
-            document.body.style.backgroundImage = 'linear-gradient(to bottom, #f0edf7, #e4eaf7)';            
-            this.$router.push({ name: 'Choose' }); // 跳转到 Choose 页面
-        }
-        else{
+        .then(res => {
+          console.log(res);
+          if (res.data == "False") {
             Toast.info('账号或密码错误！');
-        }
-
-        console.log(res.data);
+          } else {
+            // 更新全局变量
+            store.commit('updateUser', res.data);
+            isLoggedIn.value = true;
+            document.body.style.backgroundImage = 'linear-gradient(to bottom, #f0edf7, #e4eaf7)';
+            router.push({ name: 'Choose' }); // 使用 router 跳转
+          }
+          console.log(res.data);
         })
+        .catch(err => {
+          console.error('Error:', err);
+        });
+    };
 
-      .catch(err => {
-        console.error('Error:', err);
-    });
-
-      
-    },
+    return {
+      loginForm,
+      loginRules,
+      isLoggedIn,
+      submitForm,
+    };
   },
 };
 </script>

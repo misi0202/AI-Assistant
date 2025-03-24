@@ -8,8 +8,12 @@ from snownlp import SnowNLP
 
 import tqdm
 import numpy as np
-from parse_MinerU import pdf_parse_main
+from extract.parse_MinerU import pdf_parse_main
 import os, sys
+import magic_pdf.model as model_config 
+model_config.__use_inside_model__ = True;
+import nltk
+# nltk.download('punkt_tab')
 
 current_file_path = os.path.abspath(__file__)
 parent_dir = os.path.dirname(current_file_path)
@@ -139,23 +143,58 @@ def add_Emedding2Chunk(chunks, model, model_name):
 
     return new_chunks
 
-if __name__ == '__main__':
-    pdf_path = r"./pdf/知识社会史（下卷）：从《百科全书》到维基百科 ( PDFDrive ).pdf"
-    # 创建分区 分区名只能有数字字母下划线
-    partition_name = "Social_History"
-    # 课程名
-    Course_name = "知识社会史"
-    pdf_name = os.path.basename(pdf_path).split(".")[-1]
-    pdf_parse_main(pdf_path = pdf_path, parse_method="auto", is_json_md_dump=True, is_draw_visualization_bbox=False, output_dir="./output")
-    json_path = f"./output/{pdf_name}/{pdf_name}_content_list.json"
+def handleFile(Course_name, partition_name, pdf_path):
+    pdf_name = os.path.basename(pdf_path).split(".")[0]
+    pdf_parse_main(pdf_path = pdf_path, parse_method="auto", is_json_md_dump=True, is_draw_visualization_bbox=False, output_dir="E:\\vue_pro\\ai_assistant\\ai_assistant_func\\output\\")
+    json_path = f"E:\\vue_pro\\ai_assistant\\ai_assistant_func\\output\\{pdf_name}\\{pdf_name}_content_list.json"
 
-    model_1 = SentenceTransformer("/root/.cache/modelscope/hub/model1001/Conan")
+    model_1 = SentenceTransformer("E:\\vue_pro\\ai_assistant\\ai_assistant_func\\model\\Conan")
     model_2 = ZhipuAI(api_key = "864eeb3324cb0bd34584e397a70caacf.jllKABCzmHYJPxfV") 
 
     with open(json_path, 'r', encoding='utf-8') as file:
         data = json.load(file)
     # 删除该文件夹
-    folder_path = f"./output/{pdf_name}"
+    folder_path = f"E:\\vue_pro\\ai_assistant\\ai_assistant_func\\output\\{pdf_name}"
+    result_title, result_content = concat_json(data)
+    split_title, split_content = split_text(result_title, result_content)
+    chunks = [[split_title[i], split_content[i]] for i in range(len(split_title))]
+    vector_1 = add_Emedding2Chunk(chunks, model_1, "Conan")
+    vector_2 = add_Emedding2Chunk(chunks, model_2, "embedding-3")
+    vector_1 = [np.array(vec, dtype=np.float32) for vec in vector_1]
+    vector_2 = [np.array(vec, dtype=np.float32) for vec in vector_2]
+
+    Course_vector = model_1.encode(Course_name)
+
+    vectorstore = Milvus()
+    # 创建collection
+    vectorstore.create_chunk_collection()
+    vectorstore.create_course_collection()
+
+    vectorstore.create_partition(partition_name)
+    vectorstore.insert_data(partition_name, split_title, split_content, vector_1, vector_2, Course_name, pdf_name)
+    vectorstore.insert_course_data(Course_name, partition_name, pdf_name, Course_vector)
+
+    shutil.rmtree(os.path.join("E:\\vue_pro\\ai_assistant\\ai_assistant_func\\output\\", pdf_name))
+    return True
+
+if __name__ == '__main__':
+    pdf_path = "./pdf/Machine_Learning1.pdf"
+    # 创建分区 分区名只能有数字字母下划线
+    partition_name = "Machine_Learning"
+    # 课程名
+    Course_name = "机器学习"
+    pdf_name = os.path.basename(pdf_path).split(".")[0]
+    
+    pdf_parse_main(pdf_path = pdf_path, parse_method="auto", is_json_md_dump=True, is_draw_visualization_bbox=False, output_dir="..\\output\\")
+    json_path = f"../output/{pdf_name}/{pdf_name}_content_list.json"
+
+    model_1 = SentenceTransformer("../model/Conan")
+    model_2 = ZhipuAI(api_key = "864eeb3324cb0bd34584e397a70caacf.jllKABCzmHYJPxfV") 
+
+    with open(json_path, 'r', encoding='utf-8') as file:
+        data = json.load(file)
+    # 删除该文件夹
+    folder_path = f"E:\\vue_pro\\ai_assistant\\ai_assistant_func\\output\\{pdf_name}"
     # shutil.rmtree(folder_path)
 
     result_title, result_content = concat_json(data)
@@ -176,3 +215,6 @@ if __name__ == '__main__':
     vectorstore.create_partition(partition_name)
     vectorstore.insert_data(partition_name, split_title, split_content, vector_1, vector_2, Course_name, pdf_name)
     vectorstore.insert_course_data(Course_name, partition_name, pdf_name, Course_vector)
+
+    shutil.rmtree(os.path.join("..\\output", pdf_name))
+

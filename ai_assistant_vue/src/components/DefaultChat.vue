@@ -1,18 +1,11 @@
 <script setup>
 document.body.style.backgroundImage = 'linear-gradient(to bottom, #f0edf7, #e4eaf7)';; 
 import { ref } from 'vue';
-import { Chat } from '@kousum/semi-ui-vue';
+import { Chat, Notification } from '@kousum/semi-ui-vue';
 import axios from 'axios'; 
 import Navi from './Nav.vue';
 import { useStore } from 'vuex';
-const defaultMessage = [
-  {
-    role: 'system',
-    id: '1',
-    createAt: 1715676751919,
-    content: "欢迎使用东华大学AI助教系统",
-  }
-];
+import { useRouter } from 'vue-router';
 
 const roleInfo = {
   user: {
@@ -46,7 +39,25 @@ function getSharedKGName() {
       return store.state.chatCourse; // 获取 Vuex state 中的 sharedMessage
 }
 const CourseName = getSharedKGName();
+const router = useRouter();
 console.log("当前课程名：",CourseName);
+if (CourseName == "none"){
+  Notification.warning({
+        title: '提示',
+        content: '请先选择课程',
+        position: 'top',
+        theme: 'light',
+      });
+  router.push({ name: 'Choose' });
+}
+const defaultMessage = [
+  {
+    role: 'system',
+    id: '1',
+    createAt: 1715676751919,
+    content: "欢迎使用东华大学"+CourseName+"AI助教",
+  }
+];
 function scrollToBottom() {
       // 获取 div 的引用
       const contentDiv = this.$refs.contentDiv;

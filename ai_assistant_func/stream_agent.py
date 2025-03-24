@@ -12,19 +12,34 @@ import asyncio
 import sys, os
 import numpy as np
 from sentence_transformers import SentenceTransformer, util
+import warnings
+warnings.filterwarnings("ignore")
+import certifi
 
+# 设置SSL证书路径
+os.environ["SSL_CERT_FILE"] = certifi.where()
 sys.path.append(os.path.join(os.path.dirname(__file__), 'retriever'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'utils'))
-load_dotenv("/root/workspace/AI-Assistant/ai_assistant_func/.env")
+load_dotenv("../ai_assistant_func/.env")
 
 from hybrid_retriever import hybrid_search, Text2Vector, get_partition_name
 from retriever_base import BaseRetriever
-from timer import time_it
 
+
+# DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL")
+# DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+# DEEPSEEK_ENDPOINT = os.getenv("DEEPSEEK_ENDPOINT")
+# model = ChatOpenAI(
+#     temperature=0.95,
+#     model=DEEPSEEK_MODEL,
+#     openai_api_key=DEEPSEEK_API_KEY,
+#     openai_api_base=DEEPSEEK_ENDPOINT,
+#     streaming= True
+# )
 GLM_MODEL = os.getenv("GLM_MODEL")
 GLM_API_KEY = os.getenv("GLM_API_KEY")
 GLM_ENDPOINT = os.getenv("GLM_ENDPOINT")
-print(GLM_MODEL, GLM_API_KEY, GLM_ENDPOINT)
+
 model = ChatOpenAI(
     temperature=0.95,
     model=GLM_MODEL,
@@ -48,9 +63,11 @@ async def hybrid_single_retriever(user_input: str, course_name: str) -> list:
     """
     col_name = "Chunk_Collection"
     # 先根据Course_name检索到partition_name
+    print(f"课程名称：{course_name}")
     partition_name = get_partition_name(course_name)
     print(f"分区名称：{partition_name}")
-    model_1 = SentenceTransformer("/root/.cache/modelscope/hub/model1001/Conan")
+    print(f"查找内容：{user_input}")
+    model_1 = SentenceTransformer("E:\\vue_pro\\ai_assistant\\ai_assistant_func\\model\\Conan")
     model_2 = ZhipuAI(api_key = "864eeb3324cb0bd34584e397a70caacf.jllKABCzmHYJPxfV")
     vector_1 = Text2Vector(user_input, model_1, "Conan")
     vector_2 = Text2Vector(user_input, model_2, "embedding-3")
@@ -113,7 +130,10 @@ def init_agent(retriever = hybrid_single_retriever):
             (
                 "system",
                 """You are professor with rich knowledge about {course_name}. 
-                Use retriever tool to get the knowledge and answer the question""",
+                Use retriever tool to get the knowledge and answer the question.
+                Search terms can be converted to English for search.
+                ###Use hybrid Search tool if necessary.###
+                """,
             ),
             # 加入对话的历史
             MessagesPlaceholder(variable_name="chat_history"),
@@ -136,6 +156,7 @@ def init_agent(retriever = hybrid_single_retriever):
 # .stream方法的输出在(action, observation)对之间交替，最后以答案结束
 # Actions: AgentAction及其子类 Observation: 代理迄今为止的操作历史，包括当前操作及其观察结果、包含函数调用结果（又称观察结果）的聊天信息
 async def chat_with_user(course_name = "Machine Learning", user_input = "What is Lasso Regression?", chat_history = []):
+
     agent_executor = init_agent()
     chunks = []
     async for step in agent_executor.astream(
@@ -146,7 +167,6 @@ async def chat_with_user(course_name = "Machine Learning", user_input = "What is
         elif "output" in step:
             result = step["output"]
             chat_history.extend([HumanMessage(content=user_input),AIMessage(content=result)])
-
     return chunks, result, chat_history
 
 

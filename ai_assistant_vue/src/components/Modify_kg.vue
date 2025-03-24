@@ -45,7 +45,7 @@
       <Form.Input label="————————————————————————————————————————" field="chunkSeqId" :style="{ display: 'none'}" :init-value="item.chunkSeqId"></Form.Input>
       <Form.TextArea label="内容：" :init-value="item.content" field="content"/>
       <Form.Input label="————————————————————————————————————————" field="nothing" :style="{ display: 'none'}" :init-value="item.source"></Form.Input>
-      <Typography field="source">来源：{{item.source}}</Typography>
+      <Typography field="source">章节名：{{item.title}}</Typography>
       
       <Form.Input label="————————————————————————————————————————" field="source" :style="{ display: 'none'}" :init-value="item.source"></Form.Input>
       <Button htmlType="submit" type="tertiary" >点击修改</Button>
@@ -62,7 +62,7 @@
   import { ref, nextTick, onActivated, onMounted, reactive } from 'vue';
   import { Form, Toast, Card, CardGroup, Typography, Button, Notification, Modal,  TextArea } from '@kousum/semi-ui-vue';
   import axios from 'axios';
-import { backtopEmits } from 'element-plus';
+  import { backtopEmits } from 'element-plus';
 
   let treeData = [];
   let BookData = [];
@@ -180,9 +180,7 @@ import { backtopEmits } from 'element-plus';
 };
 
 const ModifyChunk = (values) => {
-  console.log(values.chunkSeqId);
-  console.log(values.content);
-  console.log(values.source);
+
   // 处理按钮点击逻辑
   axios.post('http://127.0.0.1:5000/api/modify_chunk', {
     BookName: values.source,
@@ -192,7 +190,7 @@ const ModifyChunk = (values) => {
 
   .then(res => {
     console.log(res.data);
-    location.reload();
+
     Notification.success({
       title: '修改成功',
       content: '',

@@ -40,6 +40,9 @@ class Neo4jUtils(BaseUtils):
         result = self.kg.query(search_query)
         res = []
         for r in result:
+            print(r['b.title'])
+            if r['b.title']  == "NULL":
+                continue
             res.append(r['b.title'])
 
         return res

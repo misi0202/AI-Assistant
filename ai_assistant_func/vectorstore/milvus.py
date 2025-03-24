@@ -99,3 +99,73 @@ class Milvus():
         )
         print(f"已插入{course_name}数据")
         return True
+    def find_partition(self, course_name):
+        # 执行查询
+        query_results = self.client.query(
+        collection_name="course_collection",
+        filter=f'Course_name == "{course_name}"',  # 构造过滤表达式
+        output_fields=["partition_name"]                # 指定返回的字段
+        )
+
+        # 提取 source_name 并转换为列表
+        partition_name = query_results[0]["partition_name"]
+        return partition_name
+    def find_source(self,Course_name):
+        # 执行查询
+        query_results = self.client.query(
+        collection_name="course_collection",
+        filter=f'Course_name == "{Course_name}"',  # 构造过滤表达式
+        output_fields=["source_name"]                # 指定返回的字段
+        )
+
+        # 提取 source_name 并转换为列表
+        source_list = [result["source_name"] for result in query_results]
+        return source_list
+
+    def find_chunks(self, book_title):
+        # 执行查询
+        query_results = self.client.query(
+        collection_name=self.col_name,
+        filter=f'source_book == "{book_title}"',  # 构造过滤表达式
+        output_fields=["chunkSeqId", "text", "title"]                # 指定返回的字段
+        )
+
+        # 提取 source_name 并转换为列表
+        result = [{"chunkSeqId": res["chunkSeqId"], "content": res["text"], "title": res["title"]} for res in query_results]
+        return result
+    
+    def update_chunk(self, chunkSeqId, new_content, vector1, vector2):
+        # 根据id查询内容
+        query_results = self.client.query(
+        collection_name=self.col_name,
+        filter=f'chunkSeqId == "{chunkSeqId}"',  # 构造过滤表达式
+        output_fields=["source_book","course_name", "title", "partition_name"]                # 指定返回的字段
+        )
+        source_book = query_results[0]["source_book"]
+        course_name = query_results[0]["course_name"]
+        title = query_results[0]["title"]
+        partition_name = query_results[0]["partition_name"]
+        # 删除旧数据
+        self.client.delete(
+        collection_name=self.col_name,
+        filter = f"chunkSeqId == '{chunkSeqId}'"
+        )
+        # 重新插入
+
+        data = {
+            "chunkSeqId": chunkSeqId,
+            "text": new_content,
+            "source_book": source_book,
+            "course_name": course_name,
+            "vector1": vector1,
+            "vector2": vector2,
+            "title": title,
+            "partition_name": partition_name
+        }
+        self.client.upsert(
+        collection_name=self.col_name,
+        data = data,
+        partition_name = partition_name
+        
+        )
+        return True

@@ -22,8 +22,8 @@
         :style="{ width: '350px', padding:'0px 0px 20px 0px' }"
         draggable=true
         dragMainText="点击上传文件或拖拽文件到这里"
-        dragSubText="仅支持pdf格式文件"
-        accept=".pdf"
+        dragSubText="支持pdf、pptx等格式文件"
+        accept=".pdf,.ppt,.pptx"
         :on-change="handleFileChange"
         :rules="[{ required: true, message: 'required error' }]"
         >

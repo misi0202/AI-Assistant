@@ -12,8 +12,8 @@ const store = createStore({
     updateMessage(state, newMessage) {
       state.chatCourse = newMessage;
     },
-    updateUser(state, payload) {
-      state.user = { ...state.user, ...payload };
+    updateUser(state, user) {
+      state.user = user;
     }
   },
 

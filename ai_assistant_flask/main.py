@@ -1,9 +1,14 @@
 import asyncio
+from functools import wraps
+import time
 from flask import Flask, jsonify, request
 from flask_cors import *
-from mysql import login_list
+from mysql import login_list, update_user
 import os, sys, json
 DEBUG = True
+import warnings
+from pathlib import Path
+warnings.filterwarnings("ignore")
 
 current_file_path = os.path.abspath(__file__)
 
@@ -13,25 +18,40 @@ func_dir = os.path.join(os.path.dirname(parent_dir),"ai_assistant_func")
 sys.path.append(func_dir)
 
 from stream_agent import chat_with_user
-from utils.knowledge_database import Neo4jUtils
+# from utils.knowledge_database import Neo4jUtils
+from utils.milvus_database import MilvusUtils
 from utils.file_utils import FileUtils
-
+from extract.extract_MinerU import handleFile
+from extract.extract_PPTX import handlePPTFile
 app = Flask(__name__) 
 CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
 
 # 配置文件上传保存的目录
-UPLOAD_FOLDER = 'uploads/'
+UPLOAD_FOLDER = 'E:\\vue_pro\\ai_assistant\\ai_assistant_flask\\uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # 限制上传文件大小（例如，最大为 16MB）
 app.config['MAX_CONTENT_LENGTH'] = 128 * 1024 * 1024
 
 # 允许上传的文件扩展名
-ALLOWED_EXTENSIONS = {'pdf'}
+ALLOWED_EXTENSIONS = {'pdf', 'pptx', 'ppt'}
 
+Milvus = MilvusUtils()
 # 检查文件扩展名是否合法
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def time_it(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()  # 记录开始时间
+        result = func(*args, **kwargs)
+        end_time = time.time()    # 记录结束时间
+        elapsed_time = end_time - start_time  # 计算消耗时间
+        print(f"Function '{func.__name__}' took {elapsed_time:.4f} seconds to execute.")
+        return result
+    return wrapper
 
 # 上传至指定目录
 @app.route('/api/upload', methods=['POST'])
@@ -41,7 +61,6 @@ def upload_file():
         file = request.files[key]
         # 如果没有文件，返回错误
         if file.filename == '':
-  
             return jsonify({'error': '没有选择文件'}), 200
         
         # 如果文件合法，保存到指定目录
@@ -49,6 +68,12 @@ def upload_file():
             # 确保上传目录存在
             if not os.path.exists(app.config['UPLOAD_FOLDER']):
                 os.makedirs(app.config['UPLOAD_FOLDER'])
+            # 删除原有文件
+            folder = Path(app.config['UPLOAD_FOLDER'])
+            for f in folder.iterdir():
+                if f.is_file():
+                    f.unlink() 
+                    print(f"已删除: {f}")
             
             # 保存文件
             filename = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
@@ -64,16 +89,23 @@ def upload2kg():
     file_names = [f for f in os.listdir(app.config['UPLOAD_FOLDER']) if os.path.isfile(os.path.join(app.config['UPLOAD_FOLDER'], f))]
     # 默认只有一个文件
     filename = file_names[0]
-
-    KGName = data['KGName']
-    fileU = FileUtils()
-    status = fileU.UploadPDFFile(KGName, file_names[0], open(os.path.join(app.config['UPLOAD_FOLDER'], filename), 'rb'))
-    result = {
-        "response": status
-    }
+    course_name = data['KGName']
+    partition_name = Milvus.FindPartition(course_name)
+    print(partition_name)
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    # 获取文件的后缀名 对PDF和PPT文件分别处理
+    file_type = Path(file_path).suffix.lower()
+    if file_type == ".pdf":
+        status = handleFile(course_name, partition_name, file_path)
+    elif file_type == ".pptx":
+        status = handlePPTFile(course_name, partition_name, file_path)
     # 删除文件
-    os.remove(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-    return result
+    folder = Path(app.config['UPLOAD_FOLDER'])
+    for file in folder.iterdir():
+        if file.is_file():
+            file.unlink() 
+            print(f"已删除: {file}")
+    return "succuss"
     
 @app.route('/api/test', methods=['POST'])
 def handle_ajax():
@@ -87,7 +119,7 @@ def handle_ajax():
 @app.route('/api/user_list', methods=['GET'])
 def user_list():
     data = login_list()
-    data_dict_list = [{"username": item[0], "password": item[1], "id": item[2]} for item in data]
+    data_dict_list = [{"username": item[0], "password": item[1], "role": item[2], "id": item[3]} for item in data]
 
     # 转换为 JSON 格式
     json_data = json.dumps(data_dict_list, indent=4)
@@ -102,19 +134,33 @@ def login_check():
     for user in login_list_data:
         if user[0] == username and user[1] == password:
             flag = True
-    
-    return "True" if flag else "False"
+            data = {
+            'username': user[0],
+            'password': user[1],
+            'role': user[2],
+            'id': user[3]
+            }
+            user_data = jsonify(data)
+            return "True" and user_data
+        
+    return "False"
 # 知识库问答
 @app.route('/api/knowledge_qa', methods=['POST'])
+@time_it
 def knowledge_qa():
     data = request.json
     course_name, user_input, history = data['course_name'], data['user_input'], data['history']
+    for item in history:
+        try:
+            item["content"] = item["content"].split("\n\n---\n\n", 1)[0]
+        except:
+            pass
+
     chunks, response, _ = asyncio.run(chat_with_user(course_name=course_name, user_input=user_input, chat_history=history))
     result = {
         "chunks": chunks,
         "response": response
     }
-    print(result)
     return result
 
 # 创建知识库
@@ -122,8 +168,8 @@ def knowledge_qa():
 def create_knowledge():
     data = request.json
     Name = data['KGName']
-    N4J = Neo4jUtils()
-    status = N4J.CreateCourse(Name)
+    PartitionName = data['PartitionName']
+    status = Milvus.CreateCourse(Name, PartitionName)
     result = {
         "response": status
     }
@@ -132,8 +178,9 @@ def create_knowledge():
 # 获取所有知识库名称
 @app.route('/api/get_knowledgename', methods=['GET'])
 def get_knowledge():
-    N4J = Neo4jUtils()
-    result = N4J.FindAllClass()
+    # N4J = Neo4jUtils()
+    # result = N4J.FindAllClass()
+    result = Milvus.FindAllClass()
     return jsonify(result)
 
 # 获取知识库中的书籍名称
@@ -141,8 +188,9 @@ def get_knowledge():
 def get_books():
     data = request.json
     KGName = data['KGName']
-    N4J = Neo4jUtils()
-    result = N4J.FindAllBook(KGName)
+    # N4J = Neo4jUtils()
+    # result = N4J.FindAllBook(KGName)
+    result = Milvus.FindAllBook(KGName)
     return jsonify(result)
 
 # 获取书籍中的所有Chunk
@@ -151,19 +199,34 @@ def get_chunks():
     data = request.json
     Book_name = data['BookName']
     KGName = data['KGName']
-    N4J = Neo4jUtils()
-    result = N4J.FindAllChunk(Book_name)
+    # N4J = Neo4jUtils()
+    # result = N4J.FindAllChunk(Book_name)
+    result = Milvus.FindAllChunk(Book_name)
     return jsonify(result)
 
 # 修改某个chunk
 @app.route('/api/modify_chunk', methods=['POST'])
 def modify_chunk():
     data = request.json
-    BookName = data['BookName']
     ChunkId = data['chunkSeqId']
     NewContent = data['content']
-    N4J = Neo4jUtils()
-    status = N4J.UpdateChunk(BookName, ChunkId, NewContent)
+    # N4J = Neo4jUtils()
+    # status = N4J.UpdateChunk(BookName, ChunkId, NewContent)
+    status = Milvus.UpdateChunk(ChunkId, NewContent)
+    result = {
+        "response": status
+    }
+    return result
+
+@app.route('/api/UpdateUser', methods=['POST'])
+def UpdateUser():
+    data = request.json
+    print(data)
+    username = data['username']
+    password = data['password']
+    user_id = data['user_id']
+    role = data['role']
+    status = update_user(username, password, user_id, role)
     result = {
         "response": status
     }

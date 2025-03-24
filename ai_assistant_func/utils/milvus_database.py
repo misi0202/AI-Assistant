@@ -8,7 +8,10 @@ from pymilvus import (
     FieldSchema, CollectionSchema, DataType,
     Collection, AnnSearchRequest, RRFRanker, connections,WeightedRanker
 )
-load_dotenv("/root/workspace/AI-Assistant/ai_assistant_func/.env")
+from sentence_transformers import SentenceTransformer, util
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(os.path.dirname(parent_dir), 'retriever'))
+from vectorstore.milvus import Milvus
 
 
 class MilvusUtils(BaseUtils):
@@ -18,6 +21,9 @@ class MilvusUtils(BaseUtils):
         connections.connect(host="localhost", port="19480")
         self.CourseCollection = Collection(name="course_collection")
         self.ChunkCollection = Collection(name="Chunk_Collection")
+        self.vectorstore = Milvus()
+        self.model_1 = SentenceTransformer("E:\\vue_pro\\ai_assistant\\ai_assistant_func\\model\\Conan")
+        self.model_2 = ZhipuAI(api_key = "864eeb3324cb0bd34584e397a70caacf.jllKABCzmHYJPxfV")
 
         return super().__init__()
     
@@ -37,54 +43,36 @@ class MilvusUtils(BaseUtils):
     
     def FindAllBook(self, course_name: str):
         """根据课程名称 返回书籍名称 list[str]"""
-        search_query = f"""
-        MATCH (c:Course {{title: '{course_name}'}})-[:HAVE]->(b:Book) RETURN b.title
-        """
-        result = self.kg.query(search_query)
-        res = []
-        for r in result:
-            res.append(r['b.title'])
-
+        res = self.vectorstore.find_source(course_name)
+        for r in res:
+            if r == "NULL":
+                res.remove(r)
         return res
     
     def FindAllChunk(self, book_title: str):
         """根据书籍名称 返回章节名称 list[dict]"""
-        search_query = f"""
-        MATCH (c:Chunk{{source_book: '{book_title}'}}) RETURN c.source_book as source, c.chunkSeqId as chunkSeqId,c.content as content
-        """
-        result = self.kg.query(search_query)
+
+        result = self.vectorstore.find_chunks(book_title)
 
         return result
     
-    def UpdateChunk(self, book_title: str, chunkSeqId: str, new_content: str):
+    def UpdateChunk(self,  chunkSeqId: str, new_content: str):
         """根据书籍名称和SeqId 更新章节内容"""
-        update_query = f"""
-        MATCH (c:Chunk{{source_book: '{book_title}', chunkSeqId: '{chunkSeqId}'}})
-        SET c.content = '{new_content}'
-        """
-        self.kg.query(update_query)
-        # 更新embedding
-        response = self.emedding_model.embeddings.create(
-            model= self.embedding_name, 
-            input=[new_content],
-        )
-        new_embedding = response.data[0].embedding
-        update_query = f"""
-        MATCH (c:Chunk{{source_book: '{book_title}', chunkSeqId: '{chunkSeqId}'}})
-        WITH c, {new_embedding} as vector
-        CALL db.create.setNodeVectorProperty(c, "textEmbedding", vector)
-        """
-        self.kg.query(update_query)
+        vector1 = self.model_1.encode(new_content)
+        vector2 = self.model_2.embeddings.create(model= "embedding-3", input=new_content).data[0].embedding
+        self.vectorstore.update_chunk( chunkSeqId, new_content, vector1, vector2)
         return True
     
-    def CreateCourse(self, course_name: str):
+    def CreateCourse(self, course_name: str, partition_name: str):
         """创建课程"""
-        create_query = f"""
-        MERGE (n:Course {{title: '{course_name}'}})
-        ON MATCH SET n.title = n.title
-        """
-        self.kg.query(create_query)
+        Course_vector = self.model_1.encode(course_name)
+        self.vectorstore.create_partition(partition_name)
+        self.vectorstore.insert_course_data(course_name, partition_name, "NULL", Course_vector)
         return True
+    def FindPartition(self, course_name: str):
+        """获取分区"""
+        return self.vectorstore.find_partition(course_name)
+    
 
 if __name__ == "__main__":
     utils = MilvusUtils()
