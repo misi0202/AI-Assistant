@@ -11,6 +11,7 @@
 ![替代文字](images/arch.png)
 ## 思维链范例
 <img src="images/example.png" alt="描述文字" style="width: 100%; height: auto;">
+
 ## 功能清单
 
 - 用户与权限管理（管理员 / 教师 / 学生）
@@ -73,7 +74,7 @@
 
    ```bash
    git clone https://github.com/your-username/AI-Assistant.git
-   cd ta-assistant
+   cd AI-Assistan
    ```
 
 2. 准备后端环境（示例）
